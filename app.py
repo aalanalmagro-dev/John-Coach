@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 import requests
+import base64
 from google import genai
 from google.genai import types
 
@@ -16,19 +17,34 @@ client = genai.Client()
 # =====================================================================
 # CONEXIÓN EN TIEMPO REAL CON LA API DE INTERVALS.ICU
 # =====================================================================
-@st.cache_data(ttl=3600)  # Guarda los datos en caché 1 hora para no saturar la API
+
+@st.cache_data(ttl=30)  # TTL bajo para probar ahora mismo
 def obtener_metricas_intervals():
     try:
-        # Leemos las credenciales seguras de los Secrets de Streamlit
-        athlete_id = st.secrets["INTERVALS_ATHLETE_ID"]
-        api_key = st.secrets["INTERVALS_API_KEY"]
+        # Forzar lectura limpia
+        athlete_id = str(st.secrets["INTERVALS_ATHLETE_ID"]).strip().lower()
+        api_key = str(st.secrets["INTERVALS_API_KEY"]).strip()
         
-        # Limpiamos la 'i' si viene en el ID para la URL
+        # Dejamos solo los números
         clean_id = athlete_id.replace('i', '')
-        url = f"https://intervals.icu/api/v1/athlete/{clean_id}"
         
-        # Petición oficial a los servidores de Intervals
-        respuesta = requests.get(url, auth=('athlete', api_key))
+        # El endpoint de perfil de atleta oficial en Intervals necesita barra al final
+        url = f"https://intervals.icu/api/v1/athlete/{clean_id}/"
+        
+        # Creamos la cabecera de autenticación básica de forma manual en base64
+        # Formato: "athlete:tu_api_key"
+        credenciales = f"athlete:{api_key}"
+        credenciales_bytes = credenciales.encode('utf-8')
+        base64_credenciales = base64.b64encode(credenciales_bytes).decode('utf-8')
+        
+        headers = {
+            'User-Agent': 'JohnCoach-App/1.0',
+            'Authorization': f'Basic {base64_credenciales}',
+            'Accept': 'application/json'
+        }
+        
+        # Hacemos la llamada limpia usando solo los headers
+        respuesta = requests.get(url, headers=headers, timeout=10)
         
         if respuesta.status_code == 200:
             datos = respuesta.json()
@@ -41,13 +57,12 @@ def obtener_metricas_intervals():
                 "ramp_rate": round(datos.get("ramp_rate", 0), 1),
                 "nombre": datos.get("name", "Atleta Piloto")
             }
+        else:
+            # Si el servidor responde pero con error, mostramos el código exacto
+            return {"exito": False, "error": f"Intervals denegó el acceso (Código {respuesta.status_code}). Revisa que la API Key en Secrets sea idéntica a la de la web."}
+            
     except Exception as e:
-        return {"exito": False, "error": str(e)}
-    return {"exito": False, "error": "No se pudo conectar con la API"}
-
-# Ejecutamos la carga de datos de Intervals
-with st.spinner("Sincronizando con tu perfil de Intervals.icu..."):
-    metricas = obtener_metricas_intervals()
+        return {"exito": False, "error": f"Error de conexión: {str(e)}"}
 
 # =====================================================================
 # INTERFAZ: PANEL DE CONTROL INTEGRADO
