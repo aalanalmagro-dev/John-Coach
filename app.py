@@ -22,7 +22,7 @@ Insiste siempre en mantener la calma y recuperar bien.
 # Esto simula el backend guardando el historial para que el chat tenga memoria
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "¡Hola Carlos! ¿Cómo ha ido el entrenamiento de series de hoy? Cuéntame tus sensaciones y vatios para ajustar lo de mañana."}
+        {"role": "assistant", "content": "¡Hola Jon! ¿Cómo ha ido el entrenamiento de series de hoy? Cuéntame tus sensaciones y vatios para ajustar lo de mañana."}
     ]
 
 # 3. Pintar el historial de mensajes en la pantalla (Frontend)
