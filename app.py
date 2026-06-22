@@ -28,8 +28,25 @@ def obtener_metricas_intervals():
         # 2. Limpiar el ID (quitar la 'i')
         clean_id = athlete_id.replace('i', '')
         
-        # Probar el endpoint base sin la barra final por si tu cuenta lo prefiere así
-        url = f"https://intervals.icu/api/v1/athlete/{clean_id}"
+        # Cambiamos al endpoint oficial de validación y métricas de rendimiento
+        url = "https://intervals.icu/api/v1/athlete/profile"
+        
+        # El resto del bloque se queda igual
+        credenciales = f"athlete:{api_key}"
+        base64_credenciales = base64.b64encode(credenciales.encode('utf-8')).decode('utf-8')
+        
+        headers = {
+            'User-Agent': 'JohnCoach-MVP/1.0',
+            'Authorization': f'Basic {base64_credenciales}',
+            'Accept': 'application/json'
+        }
+        
+        respuesta = requests.get(url, headers=headers, timeout=10)
+
+
+
+
+        
         
         # 3. Codificar las credenciales en formato Basic Auth manual
         credenciales = f"athlete:{api_key}"
