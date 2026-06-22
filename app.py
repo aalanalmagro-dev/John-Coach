@@ -28,7 +28,7 @@ def obtener_metricas_intervals():
         clean_id = athlete_id.replace('i', '')
         
         # URL oficial usando tu ID numérico directo
-        url = f"https://intervals.icu/api/v1/athlete/{clean_id}"
+        url = "https://intervals.icu/api/v1/athlete/profile"
         
         # 2. El método nativo e infalible de requests para Intervals.icu
         # Dejamos que requests maneje la autenticación de forma limpia
