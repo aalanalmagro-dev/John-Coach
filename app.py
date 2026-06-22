@@ -11,6 +11,27 @@ st.subheader("Tu entrenador de ciclismo personal")
 # Inicializamos el cliente de la IA (Backend)
 client = genai.Client()
 
+st.sidebar.header("📊 Perfil del Ciclista")
+nivel = st.sidebar.selectbox("Nivel", ["Cicloturista", "Amateur / Máster", "Competición"])
+ftp = st.sidebar.number_input("Tu FTP actual (Vatios)", min_value=100, max_value=500, value=250)
+horas_semana = st.sidebar.slider("Horas disponibles a la semana", 4, 20, 10)
+
+
+if st.button("✅ Validar Entrenamiento (Socio / Entrenador)"):
+    st.success("¡Entrenamiento verificado por el equipo de John Coach y enviado al calendario!")
+    # Aquí en el futuro enviarías un correo o un push al móvil del cliente
+
+
+st.subheader("📥 Conexión de la sesión de hoy")
+col1, col2, col3 = st.columns(3)
+with col1:
+    vatios_medios = st.number_input("Vatios Medios NP", value=200)
+with col2:
+    frecuencia_cardiaca = st.number_input("Pulsaciones Medias", value=140)
+with col3:
+    rpe = st.slider("Esfuerzo percibido (1 al 10)", 1, 10, 6)
+
+
 # =====================================================================
 # CONFIGURACIÓN DEL PROMPT DINÁMICO (El cerebro de John Coach)
 # =====================================================================
@@ -129,22 +150,4 @@ if prompt_usuario := st.chat_input("Escribe aquí tus sensaciones (ej: Hoy no he
 
 
 
-st.sidebar.header("📊 Perfil del Ciclista")
-nivel = st.sidebar.selectbox("Nivel", ["Cicloturista", "Amateur / Máster", "Competición"])
-ftp = st.sidebar.number_input("Tu FTP actual (Vatios)", min_value=100, max_value=500, value=250)
-horas_semana = st.sidebar.slider("Horas disponibles a la semana", 4, 20, 10)
 
-
-if st.button("✅ Validar Entrenamiento (Socio / Entrenador)"):
-    st.success("¡Entrenamiento verificado por el equipo de John Coach y enviado al calendario!")
-    # Aquí en el futuro enviarías un correo o un push al móvil del cliente
-
-
-st.subheader("📥 Conexión de la sesión de hoy")
-col1, col2, col3 = st.columns(3)
-with col1:
-    vatios_medios = st.number_input("Vatios Medios NP", value=200)
-with col2:
-    frecuencia_cardiaca = st.number_input("Pulsaciones Medias", value=140)
-with col3:
-    rpe = st.slider("Esfuerzo percibido (1 al 10)", 1, 10, 6)
