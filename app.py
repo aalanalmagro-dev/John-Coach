@@ -116,37 +116,13 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 4. Capturar la respuesta del usuario (Frontend)
-if prompt_usuario := st.chat_input("Escribe aquí tus sensaciones (ej: Hoy no he podido acabar las series...)"):
     
     # Mostramos el mensaje del usuario en la web inmediatamente
     with st.chat_message("user"):
         st.markdown(prompt_usuario)
     st.session_state.messages.append({"role": "user", "content": prompt_usuario})
 
-    # 5. Procesar la respuesta con la IA (Backend integrado)
-    with st.chat_message("assistant"):
-        with st.spinner("Tu entrenador está analizando los datos..."):
-            try:
-                # Opcional: Aquí podrías meter código Python que calcule vatios antes de llamar a la IA
-                
-                # Llamada a la API
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=prompt_usuario,
-                    config=types.GenerateContentConfig(
-                        system_instruction=PROMPT_SISTEMA,
-                        temperature=0.3
-                    ),
-                )
-                respuesta_ia = response.text
-                
-                # Pintamos la respuesta en el Frontend
-                st.markdown(respuesta_ia)
-                st.session_state.messages.append({"role": "assistant", "content": respuesta_ia})
-                
-            except Exception as e:
-                st.error(f"Hubo un error en el motor de IA: {e}")
+
 
 
 
