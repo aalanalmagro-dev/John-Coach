@@ -18,48 +18,21 @@ client = genai.Client()
 # =====================================================================
 # FUNCIÓN DE CONEXIÓN A INTERVALS.ICU (CON CHIVATO DE ERRORES)
 # =====================================================================
-@st.cache_data(ttl=10)  # TTL ultra bajo para ver cambios ya mismo
+@st.cache_data(ttl=10)
 def obtener_metricas_intervals():
     try:
-        # 1. Leer secretos asegurando que no tengan espacios en blanco
+        # 1. Leer secretos limpios
         athlete_id = str(st.secrets["INTERVALS_ATHLETE_ID"]).strip().lower()
         api_key = str(st.secrets["INTERVALS_API_KEY"]).strip()
         
-        # 2. Limpiar el ID (quitar la 'i')
         clean_id = athlete_id.replace('i', '')
         
-        # Cambiamos al endpoint oficial de validación y métricas de rendimiento
-        url = "https://intervals.icu/api/v1/athlete/profile"
+        # URL oficial usando tu ID numérico directo
+        url = f"https://intervals.icu/api/v1/athlete/{clean_id}"
         
-        # El resto del bloque se queda igual
-        credenciales = f"athlete:{api_key}"
-        base64_credenciales = base64.b64encode(credenciales.encode('utf-8')).decode('utf-8')
-        
-        headers = {
-            'User-Agent': 'JohnCoach-MVP/1.0',
-            'Authorization': f'Basic {base64_credenciales}',
-            'Accept': 'application/json'
-        }
-        
-        respuesta = requests.get(url, headers=headers, timeout=10)
-
-
-
-
-        
-        
-        # 3. Codificar las credenciales en formato Basic Auth manual
-        credenciales = f"athlete:{api_key}"
-        base64_credenciales = base64.b64encode(credenciales.encode('utf-8')).decode('utf-8')
-        
-        headers = {
-            'User-Agent': 'JohnCoach-MVP/1.0',
-            'Authorization': f'Basic {base64_credenciales}',
-            'Accept': 'application/json'
-        }
-        
-        # 4. Lanzar la petición HTTP
-        respuesta = requests.get(url, headers=headers, timeout=10)
+        # 2. El método nativo e infalible de requests para Intervals.icu
+        # Dejamos que requests maneje la autenticación de forma limpia
+        respuesta = requests.get(url, auth=('athlete', api_key), timeout=10)
         
         if respuesta.status_code == 200:
             datos = respuesta.json()
@@ -83,10 +56,9 @@ def obtener_metricas_intervals():
     except Exception as e:
         return {
             "exito": False,
-                "ftp": 250, "ctl": 0, "atl": 0, "balance": 0, "nombre": "Error",
+            "ftp": 250, "ctl": 0, "atl": 0, "balance": 0, "nombre": "Error",
             "error_msg": f"Excepción interna en la conexión: {str(e)}"
         }
-
 # =====================================================================
 # EJECUCIÓN OBLIGATORIA (Aquí se crea la variable pase lo que pase)
 # =====================================================================
