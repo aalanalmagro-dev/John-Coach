@@ -70,53 +70,62 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 7. CAPTURA DEL CHAT Y LÓGICA CON MEMORIA
+# 7. CAPTURA DEL CHAT Y LÓGICA CON MEMORIA ORGANIZADA
 if prompt_usuario := st.chat_input("Escribe aquí tus sensaciones..."):
     
-    # Mostrar y añadir mensaje del usuario
+    # Mostrar y añadir mensaje del usuario al historial visual
     with st.chat_message("user"):
         st.markdown(prompt_usuario)
+    
+    # Guardamos el mensaje real del usuario en nuestro JSON
     st.session_state.messages.append({"role": "user", "content": prompt_usuario})
-    guardar_historial(st.session_state.messages) # Guardamos en el JSON de inmediato
+    guardar_historial(st.session_state.messages)
 
     with st.chat_message("assistant"):
-        with st.spinner("Analizando todo tu histórico de entrenamiento..."):
+        with st.spinner("Pensando..."):
             try:
-                # Contexto del día actual
-                CONTEXTO_HOY = f"""
-                [DATOS DE LA SESIÓN DE HOY]
-                - FTP actual del ciclista: {ftp} W (Nivel: {nivel})
-                - Disponibilidad semanal: {horas_semana} horas
-                - Datos recogidos: {vatios_medios} W NP, {frecuencia_cardiaca} ppm, RPE: {rpe}/10.
-                """
-                
-                # Para que Gemini recuerde TODO, le pasamos el historial completo cargado del JSON
-                # más los datos específicos que acaba de meter hoy en los cuadros.
+                # Construimos la estructura de la petición para Gemini
                 peticion_con_memoria = []
-                peticion_con_memoria.append({"role": "user", "content": CONTEXTO_HOY})
                 
-                # Añadimos toda la conversación pasada
-                for msg in st.session_state.messages:
-                    peticion_con_memoria.append(msg)
+                # REGLA DE ORO: Solo le pasamos los datos físicos de los cuadros de texto
+                # si el usuario está empezando la conversación (solo hay 1 o 2 mensajes en el historial).
+                # Si ya estamos manteniendo una charla larga, NO le volvemos a pasar los vatios para no confundirla.
+                if len(st.session_state.messages) <= 3:
+                    CONTEXTO_HOY = f"""
+                    [DATOS DE LA SESIÓN DE HOY]
+                    - FTP actual del ciclista: {ftp} W (Nivel: {nivel})
+                    - Disponibilidad semanal: {horas_semana} horas
+                    - Métricas de hoy: {vatios_medios} W NP, {frecuencia_cardiaca} ppm, RPE: {rpe}/10.
+                    
+                    El ciclista abre la sesión con este comentario: "{prompt_usuario}"
+                    """
+                    # Insertamos este contexto especial como el primer mensaje del usuario para la IA
+                    peticion_con_memoria.append({"role": "user", "content": CONTEXTO_HOY})
+                else:
+                    # Si ya es una conversación prolongada, le pasamos los mensajes limpios, tal cual ocurrieron
+                    for msg in st.session_state.messages:
+                        peticion_con_memoria.append(msg)
                 
-                # Ejecutar la llamada a Gemini
+                # Ejecutar la llamada a Gemini pasando el historial correcto
                 response = client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=peticion_con_memoria,
                     config=types.GenerateContentConfig(
                         system_instruction=PROMPT_SISTEMA,
-                        temperature=0.4
+                        temperature=0.5 # Subimos un pelín para darle más espontaneidad
                     ),
                 )
                 respuesta_ia = response.text
                 
-                # Pintar y guardar la respuesta en el JSON
+                # Pintar y guardar la respuesta del entrenador
                 st.markdown(respuesta_ia)
                 st.session_state.messages.append({"role": "assistant", "content": respuesta_ia})
-                guardar_historial(st.session_state.messages) # Guardamos la respuesta en el JSON
+                guardar_historial(st.session_state.messages)
                 
             except Exception as e:
                 st.error(f"Hubo un error en el motor de IA: {e}")
+
+
 
 # 8. BOTÓN DE VALIDACIÓN
 st.write("---")
