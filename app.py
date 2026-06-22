@@ -1,34 +1,117 @@
 import streamlit as st
 import json
 import os
+import requests
 from google import genai
 from google.genai import types
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="John Coach", page_icon="🚴", layout="centered")
 st.title("🚴 John Coach")
-st.subheader("Tu entrenador de IA con memoria persistente")
+st.subheader("Modo Piloto: Conectado en tiempo real a Intervals.icu")
 
 # 2. INICIALIZAR EL CLIENTE DE IA
 client = genai.Client()
 
-# 3. DIRECTRICES FIJAS DEL ENTRENADOR
-PROMPT_SISTEMA = """
-Eres el Director Técnico y entrenador jefe de 'John Coach' (la línea de software de Zephyr). Tu rol es el de un entrenador de carne y hueso, un colega experto y un mentor de total confianza para el ciclista.
+# =====================================================================
+# CONEXIÓN EN TIEMPO REAL CON LA API DE INTERVALS.ICU
+# =====================================================================
+@st.cache_data(ttl=3600)  # Guarda los datos en caché 1 hora para no saturar la API
+def obtener_metricas_intervals():
+    try:
+        # Leemos las credenciales seguras de los Secrets de Streamlit
+        athlete_id = st.secrets["INTERVALS_ATHLETE_ID"]
+        api_key = st.secrets["INTERVALS_API_KEY"]
+        
+        # Limpiamos la 'i' si viene en el ID para la URL
+        clean_id = athlete_id.replace('i', '')
+        url = f"https://intervals.icu/api/v1/athlete/{clean_id}"
+        
+        # Petición oficial a los servidores de Intervals
+        respuesta = requests.get(url, auth=('athlete', api_key))
+        
+        if respuesta.status_code == 200:
+            datos = respuesta.json()
+            return {
+                "exito": True,
+                "ftp": datos.get("icu_ftp", 250),
+                "ctl": round(datos.get("ctl", 0), 1),
+                "atl": round(datos.get("atl", 0), 1),
+                "balance": round(datos.get("ctl", 0) - datos.get("atl", 0), 1),
+                "ramp_rate": round(datos.get("ramp_rate", 0), 1),
+                "nombre": datos.get("name", "Atleta Piloto")
+            }
+    except Exception as e:
+        return {"exito": False, "error": str(e)}
+    return {"exito": False, "error": "No se pudo conectar con la API"}
 
-Tu objetivo principal es mantener una CONVERSACIÓN FLUIDA, DINÁMICA Y ADAPTATIVA. No estás limitado a mirar solo el día de mañana. Debes escuchar activamente lo que el ciclista te pide en cada mensaje y responder exactamente a su necesidad actual.
+# Ejecutamos la carga de datos de Intervals
+with st.spinner("Sincronizando con tu perfil de Intervals.icu..."):
+    metricas = obtener_metricas_intervals()
+
+# =====================================================================
+# INTERFAZ: PANEL DE CONTROL INTEGRADO
+# =====================================================================
+
+if metricas.get("exito"):
+    st.success(f"🤖 ¡Conectado al perfil de **{metricas['nombre']}**!")
+    
+    # Mostramos tus datos reales de rendimiento en 4 tarjetas guapísimas
+    col_ftp, col_ctl, col_atl, col_tsb = st.columns(4)
+    with col_ftp:
+        st.metric(label="FTP Actual", value=f"{metricas['ftp']} W")
+    with col_ctl:
+        st.metric(label="CTL (Fitness)", value=metricas['ctl'])
+    with col_atl:
+        st.metric(label="ATL (Fatiga)", value=metricas['atl'])
+    with col_tsb:
+        # El balance de estrés (TSB) nos dice si estás fresco o al límite
+        st.metric(label="Forma (TSB)", value=f"{metricas['balance']}")
+        
+    # Guardamos los vatios automáticos para el backend
+    ftp_intervals = metricas['ftp']
+else:
+    st.error(f"No se han podido cargar los datos automáticos: {metricas.get('error')}")
+    ftp_intervals = 250 # Valor por defecto si falla la API
+
+# 3. INTERFAZ: BARRA LATERAL REPROGRAMADA
+st.sidebar.header("📊 Ajustes del Piloto")
+nivel = st.sidebar.selectbox("Nivel", ["Cicloturista", "Amateur / Máster", "Competición"])
+horas_semana = st.sidebar.slider("Horas disponibles esta semana", 4, 20, 10)
+
+# Formulario para simular el entrenamiento del día actual
+st.write("---")
+st.subheader("📥 Datos de la salida que acabas de hacer")
+col1, col2, col3 = st.columns(3)
+with col1:
+    vatios_medios = st.number_input("Vatios Medios NP de hoy", value=200)
+with col2:
+    frecuencia_cardiaca = st.number_input("Pulsaciones Medias", value=140)
+with col3:
+    rpe = st.slider("Esfuerzo percibido (1 al 10)", 1, 10, 6)
+
+# =====================================================================
+# PROMPT DEL SISTEMA ACTUALIZADO CON CIENCIA DE INTERVALS
+# =====================================================================
+PROMPT_SISTEMA = f"""
+Eres el Director Técnico y entrenador jefe de 'John Coach'. Tu rol es el de un entrenador de carne y hueso, un colega experto y un mentor de total confianza para el ciclista.
+
+Tu objetivo principal es mantener una CONVERSACIÓN FLUIDA, DINÁMICA Y ADAPTATIVA basada en métricas científicas avanzadas de rendimiento (procedentes de Intervals.icu).
+
+Métricas fijas de tu atleta actual:
+- FTP del ciclista: {ftp_intervals} W.
+- Estado físico actual (CTL/Fitness): {metricas.get('ctl', 'N/A')}.
+- Fatiga acumulada (ATL): {metricas.get('atl', 'N/A')}.
+- Balance actual (TSB/Forma): {metricas.get('balance', 'N/A')}. (Si es muy negativo, está en zona de fatiga óptima pero al límite; si es positivo, está fresco).
 
 Sigue estrictamente estas directrices de flujo y comportamiento:
-1. ADAPTABILIDAD AL CONTEXTO: Si el ciclista te pide el entreno de mañana, dale solo mañana. Si te pide planificar el resto de la semana porque tiene una carrera, ábrele el plano y estructúrale los días que hagan falta. Si solo quiere comentarte un dolor o pedirte un consejo de desarrollo, responde a eso sin meter entrenos a la fuerza.
-2. EVITA REPETICIONES: Una vez que ya has analizado los vatios o datos de la sesión actual en el primer mensaje, NO vuelvas a mencionarlos ni a dar la bienvenida en los siguientes mensajes del hilo a menos que el usuario te pregunte algo específico sobre ellos. Asimila los datos y continúa la charla de forma natural.
-3. ACTITUD Y TONO: Sé un compañero accesible pero un profesional riguroso. Prohibido usar introducciones robóticas o corporativas (nada de '¡Excelente trabajo hoy!' o '¡Hola de nuevo!' en cada respuesta). Habla en prosa natural, usando jerga ciclista (series, vatios, ir con chispa, Zona 1, acoplarse, volumen, afinamiento).
-4. SEGURIDAD: Si en cualquier punto de la conversación detectas fatiga extrema, frustración por series no completadas o dolor físico/articular, frena su ímpetu con asertividad cercana. Prioriza el descanso o entrenamientos regenerativos (Z1) antes de mandarle tralla.
-
-Habla de tú a tú, fluye como en un chat de WhatsApp y sé tan espontáneo como un preparador físico real.
+1. ADAPTABILIDAD AL CONTEXTO: Si el ciclista te pide el entreno de mañana, dale solo mañana. Si te pide planificar el resto de la semana porque tiene una carrera, ábrele el plano y estructúrale los días que hagan falta usando las métricas de CTL y ATL para justificar el descanso o la carga.
+2. EVITA REPETICIONES: Una vez analizados los datos del día en el primer mensaje, no vuelvas a recordarle sus métricas de forma robótica. Úsalas como contexto de fondo para guiar tus decisiones.
+3. TONO: Habla de tú a tú, cercano, en prosa natural, usando jerga ciclista pura (series, ir con chispa, Zona 1, acoplarse, vaciarse, afilar el punto). Prohibido usar saludos corporativos repetitivos.
 """
 
 # =====================================================================
-# GESTIÓN DE LA MEMORIA REAL (Archivo JSON)
+# HISTORIAL Y LÓGICA DE CHAT PERSISTENTE (JSON LOCAL)
 # =====================================================================
 ARCHIVO_HISTORIAL = "historial_entrenamientos.json"
 
@@ -37,103 +120,64 @@ def cargar_historial():
         with open(ARCHIVO_HISTORIAL, "r", encoding="utf-8") as f:
             return json.load(f)
     return [
-        {"role": "assistant", "content": "¡Hola! Bienvenido de nuevo a tu plan de entrenamiento en John Coach. Cuéntame, ¿cómo ha ido la sesión de hoy y cómo te vas encontrando?"}
+        {"role": "assistant", "content": f"¡Hola! Acabo de sincronizar tu cuenta de Intervals. Tu CTL está en {metricas.get('ctl')} y tu fatiga en {metricas.get('atl')}. Cuéntame, ¿cómo ha ido la sesión de hoy y cómo planteamos los siguientes días?"}
     ]
 
 def guardar_historial(historial):
     with open(ARCHIVO_HISTORIAL, "w", encoding="utf-8") as f:
         json.dump(historial, f, ensure_ascii=False, indent=4)
 
-# Inicializamos el estado de la sesión de Streamlit cargando el archivo físico
 if "messages" not in st.session_state:
     st.session_state.messages = cargar_historial()
-# =====================================================================
 
-# 4. INTERFAZ: BARRA LATERAL (Perfil)
-st.sidebar.header("📊 Perfil del Ciclista")
-nivel = st.sidebar.selectbox("Nivel", ["Cicloturista", "Amateur / Máster", "Competición"])
-ftp = st.sidebar.number_input("Tu FTP actual (Vatios)", min_value=100, max_value=500, value=250)
-horas_semana = st.sidebar.slider("Horas disponibles a la semana", 4, 20, 10)
-
-# 5. INTERFAZ: DATOS DE LA SESIÓN
-st.subheader("📥 Conexión de la sesión de hoy")
-col1, col2, col3 = st.columns(3)
-with col1:
-    vatios_medios = st.number_input("Vatios Medios NP", value=200)
-with col2:
-    frecuencia_cardiaca = st.number_input("Pulsaciones Medias", value=140)
-with col3:
-    rpe = st.slider("Esfuerzo percibido (1 al 10)", 1, 10, 6)
-
-# 6. PINTAR EL HISTORIAL EN PANTALLA
+# Pintar el historial en pantalla
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 7. CAPTURA DEL CHAT Y LÓGICA CON MEMORIA CORREGIDA
+# Captura del chat y envío con memoria limpia
 if prompt_usuario := st.chat_input("Escribe aquí tus sensaciones..."):
     
-    # 1. Mostramos el mensaje del usuario en la pantalla inmediatamente
     with st.chat_message("user"):
         st.markdown(prompt_usuario)
-    
-    # 2. Guardamos el mensaje en el session_state
     st.session_state.messages.append({"role": "user", "content": prompt_usuario})
 
-    # 3. Preparamos el paquete de mensajes que va a viajar a Gemini
     peticion_con_memoria = []
     
-    # Si es el PRIMER mensaje que envía el usuario, le inyectamos los vatios por detrás
-    # El historial tiene 2 mensajes en este punto (el de bienvenida de la IA y el que acaba de escribir el usuario)
+    # Inyección de los datos del entrenamiento de hoy solo en el primer mensaje de la sesión
     if len(st.session_state.messages) == 2:
         CONTEXTO_HOY = f"""
-        [MÉTRICAS DE LA SESIÓN DE HOY - ENVIADO POR EL GARMIN DEL USUARIO]
-        - FTP actual: {ftp} W (Nivel: {nivel})
-        - Disponibilidad semanal: {horas_semana} horas
-        - Datos de hoy: {vatios_medios} W NP, {frecuencia_cardiaca} ppm, RPE: {rpe}/10.
-
-        [COMENTARIO DEL CICLISTA]:
-        "{prompt_usuario}"
-        """
-        # Sustituimos su primer mensaje por este enriquecido con los datos numéricos
-        peticion_con_memoria.append({"role": "user", "content": CONTEXTO_HOY})
-    
-    else:
-        # SI YA ES EL SEGUNDO MENSAJE O SUCESIVOS:
-        # Le pasamos a Gemini el historial limpio tal y como ha ocurrido. 
-        # Como en el primer mensaje ya le metimos los vatios, Gemini los recordará en su memoria 
-        # sin necesidad de que se los volvamos a enviar en los cuadros de texto.
+        [MÉTRICAS DE LA SESIÓN GRABADAS HOY]
+        - Esfuerzo de hoy: {vatios_medios} W NP, {frecuencia_cardiaca} ppm, RPE: {rpe}/10.
+        - Disponibilidad de tiempo: {horas_semana} horas.
         
-        # El primer mensaje visual es de la IA (bienvenida), pero Gemini necesita que la lista empiece con "user".
-        # Así que nos saltamos el saludo inicial para que el flujo de turnos sea perfecto: [user, assistant, user, assistant...]
+        Comentario inicial del ciclista: "{prompt_usuario}"
+        """
+        peticion_con_memoria.append({"role": "user", "content": CONTEXTO_HOY})
+    else:
         for msg in st.session_state.messages[1:]:
             peticion_con_memoria.append(msg)
 
-    # 4. Llamada al entrenador (IA)
     with st.chat_message("assistant"):
-        with st.spinner("Analizando tu evolución..."):
+        with st.spinner("Pensando..."):
             try:
-                # Ejecutar la llamada a Gemini con el prompt limpio y dinámico
                 response = client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=peticion_con_memoria,
                     config=types.GenerateContentConfig(
-                        system_instruction=PROMPT_SISTEMA, # <--- Usamos el nuevo prompt directo
-                        temperature=0.6 # Un pelín más de temperatura para que sea más creativo y suelto
+                        system_instruction=PROMPT_SISTEMA,
+                        temperature=0.6
                     ),
                 )
                 respuesta_ia = response.text
-                
-                # Pintamos la respuesta y la guardamos
                 st.markdown(respuesta_ia)
                 st.session_state.messages.append({"role": "assistant", "content": respuesta_ia})
-                guardar_historial(st.session_state.messages) # Guardamos todo en el JSON
+                guardar_historial(st.session_state.messages)
                 
             except Exception as e:
                 st.error(f"Hubo un error en el motor de IA: {e}")
 
-
-# 8. BOTÓN DE VALIDACIÓN
+# Botón de validación
 st.write("---")
 if st.button("✅ Validar Entrenamiento (Socio / Entrenador)"):
     st.success("¡Entrenamiento verificado por el equipo de John Coach y guardado!")
