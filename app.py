@@ -64,6 +64,14 @@ def obtener_metricas_intervals():
     except Exception as e:
         return {"exito": False, "error": f"Error de conexión: {str(e)}"}
 
+
+# =====================================================================
+# 🔥 ¡REVISA QUE ESTA LÍNEA DE AQUÍ ABAJO ESTÉ PUESTA! 🔥
+# =====================================================================
+# Ejecutamos la carga de datos de Intervals y creamos la variable 'metricas'
+with st.spinner("Sincronizando con tu perfil de Intervals.icu..."):
+    metricas = obtener_metricas_intervals() # <--- ESTA ES LA LÍNEA CRUCIAL
+
 # =====================================================================
 # INTERFAZ: PANEL DE CONTROL INTEGRADO
 # =====================================================================
