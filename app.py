@@ -58,28 +58,27 @@ def obtener_metricas_intervals():
                 "nombre": datos.get("name", "Atleta Piloto")
             }
         else:
-            else:
-                st.error(f"No se han podido cargar los datos automáticos: {metricas.get('error')}")
+            st.error(f"No se han podido cargar los datos automáticos: {metricas.get('error')}")
+            
+            # 🕵️‍♂️ BLOQUE DE DIAGNÓSTICO TEMPORAL
+            st.warning("🔍 [ZONA DE DEPURACIÓN] Vamos a comprobar qué está leyendo el código:")
+            try:
+                raw_id = st.secrets["INTERVALS_ATHLETE_ID"]
+                raw_key = st.secrets["INTERVALS_API_KEY"]
                 
-                # 🕵️‍♂️ BLOQUE DE DIAGNÓSTICO TEMPORAL
-                st.warning("🔍 [ZONA DE DEPURACIÓN] Vamos a comprobar qué está leyendo el código:")
-                try:
-                    raw_id = st.secrets["INTERVALS_ATHLETE_ID"]
-                    raw_key = st.secrets["INTERVALS_API_KEY"]
+                # Mostramos el ID tal cual llega
+                st.write(f"• ID en Secrets: `{raw_id}` (Longitud: {len(str(raw_id))} caracteres)")
+                
+                # Mostramos la Key de forma segura (Ocultando el centro)
+                if len(raw_key) > 8:
+                    ofuscada = f"{raw_key[:4]}••••••••{raw_key[-4:]}"
+                else:
+                    ofuscada = "¡La clave es demasiado corta!"
                     
-                    # Mostramos el ID tal cual llega
-                    st.write(f"• ID en Secrets: `{raw_id}` (Longitud: {len(str(raw_id))} caracteres)")
-                    
-                    # Mostramos la Key de forma segura (Ocultando el centro)
-                    if len(raw_key) > 8:
-                        ofuscada = f"{raw_key[:4]}••••••••{raw_key[-4:]}"
-                    else:
-                        ofuscada = "¡La clave es demasiado corta!"
-                        
-                    st.write(f"• API Key en Secrets: `{ofuscada}` (Longitud total: {len(raw_key)} caracteres)")
-                    
-                except Exception as e:
-                    st.error(f"Error al intentar leer los Secrets desde el código: {e}")
+                st.write(f"• API Key en Secrets: `{ofuscada}` (Longitud total: {len(raw_key)} caracteres)")
+                
+            except Exception as e:
+                st.error(f"Error al intentar leer los Secrets desde el código: {e}")
     except Exception as e:
         return {"exito": False, "error": f"Error de conexión: {str(e)}"}
 
