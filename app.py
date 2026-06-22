@@ -14,17 +14,17 @@ client = genai.Client()
 
 # 3. DIRECTRICES FIJAS DEL ENTRENADOR
 PROMPT_SISTEMA = """
-Eres el Director Técnico de 'John Coach'. Tu rol no es el de una IA robótica o un asistente virtual formal, sino el de un entrenador de carne y hueso, un colega experto y un colaborador de confianza para el ciclista.
+Eres el Director Técnico y entrenador jefe de 'John Coach' (la línea de software de Zephyr). Tu rol es el de un entrenador de carne y hueso, un colega experto y un mentor de total confianza para el ciclista.
 
-Tu objetivo principal es comunicarte con una claridad cercana, naturalidad y empatía. Si el ciclista ha tenido un mal día o arrastra fatiga, valida sus sensaciones, muéstrate comprensivo y prioriza siempre su salud antes de soltarle un sermón teórico sobre los vatios.
+Tu objetivo principal es mantener una CONVERSACIÓN FLUIDA, DINÁMICA Y ADAPTATIVA. No estás limitado a mirar solo el día de mañana. Debes escuchar activamente lo que el ciclista te pide en cada mensaje y responder exactamente a su necesidad actual.
 
-Sigue estrictamente estas directrices de voz y tono (las mismas que guían mis respuestas contigo):
-1. ACTITUD: Sé un compañero accesible y un profesional riguroso, pero jamás adoptes un tono académico, pedante o rígidamente estructurado. No uses introducciones repetitivas o corporativas (prohibido empezar con '¡Hola de nuevo!' o frases vacías como '¡Excelente entrenamiento!'). Ve directo al grano con calidez.
-2. LENGUAJE: Habla como se habla en la grupeta o en una reunión de desarrollo. Usa términos ciclistas con total naturalidad (series, vatios, ir con chispa, Zona 1, vaciarse, acoplarse, rodaje de volumen, pretemporada). 
-3. DINAMISMO Y FLUJO: Evita que tus respuestas parezcan plantillas. Fluye de manera orgánica. Combina explicaciones concisas basados en datos (su FTP, sus vatios medios, su RPE) con metáforas sencillas o consejos prácticos. Si necesitas estructurar algo, usa viñetas cortas, pero deja que la conversación principal fluya en prosa natural.
-4. REGLA DE SEGURIDAD SPORT: Si los números reflejan un sobreesfuerzo brutal para su nivel, si el RPE es alarmante o si menciona molestias físicas específicas (como dolores de rodilla o espalda), frena su ímpetu con asertividad pero de forma cercana. Recétale descanso o un paseo regenerativo suave por debajo de su Zona 2.
+Sigue estrictamente estas directrices de flujo y comportamiento:
+1. ADAPTABILIDAD AL CONTEXTO: Si el ciclista te pide el entreno de mañana, dale solo mañana. Si te pide planificar el resto de la semana porque tiene una carrera, ábrele el plano y estructúrale los días que hagan falta. Si solo quiere comentarte un dolor o pedirte un consejo de desarrollo, responde a eso sin meter entrenos a la fuerza.
+2. EVITA REPETICIONES: Una vez que ya has analizado los vatios o datos de la sesión actual en el primer mensaje, NO vuelvas a mencionarlos ni a dar la bienvenida en los siguientes mensajes del hilo a menos que el usuario te pregunte algo específico sobre ellos. Asimila los datos y continúa la charla de forma natural.
+3. ACTITUD Y TONO: Sé un compañero accesible pero un profesional riguroso. Prohibido usar introducciones robóticas o corporativas (nada de '¡Excelente trabajo hoy!' o '¡Hola de nuevo!' en cada respuesta). Habla en prosa natural, usando jerga ciclista (series, vatios, ir con chispa, Zona 1, acoplarse, volumen, afinamiento).
+4. SEGURIDAD: Si en cualquier punto de la conversación detectas fatiga extrema, frustración por series no completadas o dolor físico/articular, frena su ímpetu con asertividad cercana. Prioriza el descanso o entrenamientos regenerativos (Z1) antes de mandarle tralla.
 
-Habla de tú a tú, sé espontáneo, adáptate a su estado de ánimo y haz que el atleta sienta que al otro lado de la pantalla hay un mentor que entiende perfectamente la fatiga, la pasión por la bici y el esfuerzo diario.
+Habla de tú a tú, fluye como en un chat de WhatsApp y sé tan espontáneo como un preparador físico real.
 """
 
 # =====================================================================
@@ -70,61 +70,67 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# 7. CAPTURA DEL CHAT Y LÓGICA CON MEMORIA ORGANIZADA
+# 7. CAPTURA DEL CHAT Y LÓGICA CON MEMORIA CORREGIDA
 if prompt_usuario := st.chat_input("Escribe aquí tus sensaciones..."):
     
-    # Mostrar y añadir mensaje del usuario al historial visual
+    # 1. Mostramos el mensaje del usuario en la pantalla inmediatamente
     with st.chat_message("user"):
         st.markdown(prompt_usuario)
     
-    # Guardamos el mensaje real del usuario en nuestro JSON
+    # 2. Guardamos el mensaje en el session_state
     st.session_state.messages.append({"role": "user", "content": prompt_usuario})
-    guardar_historial(st.session_state.messages)
 
+    # 3. Preparamos el paquete de mensajes que va a viajar a Gemini
+    peticion_con_memoria = []
+    
+    # Si es el PRIMER mensaje que envía el usuario, le inyectamos los vatios por detrás
+    # El historial tiene 2 mensajes en este punto (el de bienvenida de la IA y el que acaba de escribir el usuario)
+    if len(st.session_state.messages) == 2:
+        CONTEXTO_HOY = f"""
+        [MÉTRICAS DE LA SESIÓN DE HOY - ENVIADO POR EL GARMIN DEL USUARIO]
+        - FTP actual: {ftp} W (Nivel: {nivel})
+        - Disponibilidad semanal: {horas_semana} horas
+        - Datos de hoy: {vatios_medios} W NP, {frecuencia_cardiaca} ppm, RPE: {rpe}/10.
+
+        [COMENTARIO DEL CICLISTA]:
+        "{prompt_usuario}"
+        """
+        # Sustituimos su primer mensaje por este enriquecido con los datos numéricos
+        peticion_con_memoria.append({"role": "user", "content": CONTEXTO_HOY})
+    
+    else:
+        # SI YA ES EL SEGUNDO MENSAJE O SUCESIVOS:
+        # Le pasamos a Gemini el historial limpio tal y como ha ocurrido. 
+        # Como en el primer mensaje ya le metimos los vatios, Gemini los recordará en su memoria 
+        # sin necesidad de que se los volvamos a enviar en los cuadros de texto.
+        
+        # El primer mensaje visual es de la IA (bienvenida), pero Gemini necesita que la lista empiece con "user".
+        # Así que nos saltamos el saludo inicial para que el flujo de turnos sea perfecto: [user, assistant, user, assistant...]
+        for msg in st.session_state.messages[1:]:
+            peticion_con_memoria.append(msg)
+
+    # 4. Llamada al entrenador (IA)
     with st.chat_message("assistant"):
-        with st.spinner("Pensando..."):
+        with st.spinner("Analizando tu evolución..."):
             try:
-                # Construimos la estructura de la petición para Gemini
-                peticion_con_memoria = []
-                
-                # REGLA DE ORO: Solo le pasamos los datos físicos de los cuadros de texto
-                # si el usuario está empezando la conversación (solo hay 1 o 2 mensajes en el historial).
-                # Si ya estamos manteniendo una charla larga, NO le volvemos a pasar los vatios para no confundirla.
-                if len(st.session_state.messages) <= 3:
-                    CONTEXTO_HOY = f"""
-                    [DATOS DE LA SESIÓN DE HOY]
-                    - FTP actual del ciclista: {ftp} W (Nivel: {nivel})
-                    - Disponibilidad semanal: {horas_semana} horas
-                    - Métricas de hoy: {vatios_medios} W NP, {frecuencia_cardiaca} ppm, RPE: {rpe}/10.
-                    
-                    El ciclista abre la sesión con este comentario: "{prompt_usuario}"
-                    """
-                    # Insertamos este contexto especial como el primer mensaje del usuario para la IA
-                    peticion_con_memoria.append({"role": "user", "content": CONTEXTO_HOY})
-                else:
-                    # Si ya es una conversación prolongada, le pasamos los mensajes limpios, tal cual ocurrieron
-                    for msg in st.session_state.messages:
-                        peticion_con_memoria.append(msg)
-                
-                # Ejecutar la llamada a Gemini pasando el historial correcto
+                # Ejecutar la llamada a Gemini con el prompt limpio y dinámico
                 response = client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=peticion_con_memoria,
                     config=types.GenerateContentConfig(
-                        system_instruction=PROMPT_SISTEMA,
-                        temperature=0.5 # Subimos un pelín para darle más espontaneidad
+                        system_instruction=PROMPT_SISTEMA, # <--- Usamos el nuevo prompt directo
+                        temperature=0.6 # Un pelín más de temperatura para que sea más creativo y suelto
                     ),
                 )
                 respuesta_ia = response.text
                 
-                # Pintar y guardar la respuesta del entrenador
+                # Pintamos la respuesta y la guardamos
                 st.markdown(respuesta_ia)
                 st.session_state.messages.append({"role": "assistant", "content": respuesta_ia})
-                guardar_historial(st.session_state.messages)
+                guardar_historial(st.session_state.messages) # Guardamos todo en el JSON
                 
             except Exception as e:
                 st.error(f"Hubo un error en el motor de IA: {e}")
-
 
 
 # 8. BOTÓN DE VALIDACIÓN
