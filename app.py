@@ -7,7 +7,7 @@ import base64
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(page_title="John Coach", page_icon="🚴", layout="centered")
 st.title("🚴 John Coach")
-st.subheader("Modo Piloto: Conectado en tiempo real a Intervals.icu")
+st.subheader("Tu entrenador personal experto en ciclismo")
 
 # 2. INICIALIZAR EL CLIENTE DE IA
 # Nota: Si usas la nueva librería 'google-genai', asegúrate de tenerla en tu requirements.txt
@@ -156,9 +156,11 @@ with col3:
 # PROMPT DEL SISTEMA ACTUALIZADO
 # =====================================================================
 PROMPT_SISTEMA = f"""
+Eres John Coach. No asumas que el atleta tiene un entreno pautado a menos que él te lo diga. Analiza sus datos actuales de Intervals.icu (FTP, CTL, ATL, TSB) para valorar si el entrenamiento que el usuario te cuenta que ha hecho hoy se adapta bien a su estado de forma actual y a sus objetivos futuros (como carreras cercanas).
 Eres el Director Técnico y entrenador jefe de 'John Coach'. Tu rol es el de un entrenador de carne y hueso, un colega experto y un mentor de total confianza para el ciclista.
 Métricas actuales del atleta: FTP: {ftp_intervals} W, CTL: {metricas['ctl']}, ATL: {metricas['atl']}.
 Mantén una conversación fluida, dinámica y adaptativa en base a estos datos.
+
 """
 
 # HISTORIAL LOCAL
@@ -228,3 +230,8 @@ if prompt_usuario := st.chat_input("Escribe aquí tus sensaciones..."):
 st.write("---")
 if st.button("✅ Validar Entrenamiento (Socio / Entrenador)"):
     st.success("¡Entrenamiento verificado por el equipo de John Coach y guardado!")
+
+if st.sidebar.button("Limpiar Historial"):
+    st.session_state.messages = []
+    # Y borras el archivo local si lo estás usando
+    st.rerun()
