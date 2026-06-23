@@ -30,29 +30,36 @@ def obtener_metricas_intervals():
         res_wellness = requests.get(url_wellness, auth=('API_KEY', api_key), timeout=10)
         
         nombre_usuario = "Atleta Conectado"
-        ftp_real = 250  # Valor base de seguridad si todo fallara de origen
+        ftp_real = 250  # Base por si fallara la red
         ctl_real, atl_real = 0.0, 0.0
         
         if res_atleta.status_code == 200:
             datos_atleta = res_atleta.json()
             nombre_usuario = datos_atleta.get("name") or datos_atleta.get("username", "Atleta Conectado")
             
-            # 🔥 INTENTO 1: Buscar en la raíz tradicional
+            # 1. Buscamos el FTP en la raíz por si acaso
             ftp_api = datos_atleta.get("icu_ftp") or datos_atleta.get("ftp")
             
-            # 🔥 INTENTO 2: Buscar en la estructura de ciclismo (donde Intervals suele guardarlo)
-            if not ftp_api and "cycling_settings" in datos_atleta:
-                ftp_api = datos_atleta["cycling_settings"].get("ftp")
-                
-            # 🔥 INTENTO 3: Buscar en las zonas generales
-            if not ftp_api and "zones" in datos_atleta:
-                ftp_api = datos_atleta["zones"].get("ftp")
+            # 2. Exploramos 'sportSettings' (Detectado en tu API)
+            if not ftp_api and "sportSettings" in datos_atleta:
+                settings = datos_atleta["sportSettings"]
+                # Si es una lista, buscamos el bloque de ciclismo o cogemos el primero
+                if isinstance(settings, list) and len(settings) > 0:
+                    # Intentamos buscar el que sea de ciclismo de forma inteligente
+                    bici_setting = next((s for s in settings if str(s.get("id")).lower() in ["cycling", "bici", "road"]), settings[0])
+                    ftp_api = bici_setting.get("ftp") or bici_setting.get("icu_ftp")
+                elif isinstance(settings, dict):
+                    # Si es un diccionario, intentamos sacar el ftp general o de cycling
+                    ftp_api = settings.get("ftp") or settings.get("cycling", {}).get("ftp")
+
+            # 3. Último cartucho dinámico: 'icu_type_settings'
+            if not ftp_api and "icu_type_settings" in datos_atleta:
+                type_settings = datos_atleta["icu_type_settings"]
+                if isinstance(type_settings, dict):
+                    ftp_api = type_settings.get("ftp") or type_settings.get("cycling", {}).get("ftp")
             
             if ftp_api:
                 ftp_real = int(ftp_api)
-            else:
-                # Si sigue sin encontrarlo, dejamos un chivato temporal en la interfaz
-                st.info("Estructura detectada en la API: " + str(list(datos_atleta.keys())))
             
         if res_wellness.status_code == 200:
             datos_wellness = res_wellness.json()
@@ -78,7 +85,7 @@ def obtener_metricas_intervals():
             return {
                 "exito": False,
                 "ftp": 250, "ctl": 0, "atl": 0, "balance": 0, "nombre": "Error",
-                "error_msg": f"Error de sincronización (Códigos: {res_atleta.status_code})"
+                "error_msg": f"Error de sincronización (Código: {res_atleta.status_code})"
             }
             
     except Exception as e:
@@ -87,7 +94,7 @@ def obtener_metricas_intervals():
             "ftp": 250, "ctl": 0, "atl": 0, "balance": 0, "nombre": "Error",
             "error_msg": f"Fallo en sincronización dinámica: {str(e)}"
         }
-# =====================================================================
+====================================================
 # EJECUCIÓN OBLIGATORIA (Aquí se crea la variable pase lo que pase)
 # =====================================================================
 with st.spinner("Sincronizando con tu perfil de Intervals.icu..."):
