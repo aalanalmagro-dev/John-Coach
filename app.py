@@ -214,7 +214,7 @@ if prompt_usuario := st.chat_input("Escribe aquí tus sensaciones..."):
             try:
                 response = client.models.generate_content(
                     #model='gemini-2.5-flash',
-                    model='gemini-2.0-flash',
+                    model='gemini-1.5-flash',
                     contents=contents_api,
                     config=types.GenerateContentConfig(system_instruction=PROMPT_SISTEMA, temperature=0.6),
                 )
