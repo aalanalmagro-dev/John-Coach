@@ -21,18 +21,15 @@ client = genai.Client()
 @st.cache_data(ttl=10)
 def obtener_metricas_intervals():
     try:
-        # 1. Leer secretos limpios
-        athlete_id = str(st.secrets["INTERVALS_ATHLETE_ID"]).strip().lower()
+        # 1. Leer secreto limpio
         api_key = str(st.secrets["INTERVALS_API_KEY"]).strip()
         
-        clean_id = athlete_id.replace('i', '')
+        # El endpoint universal oficial según el Cookbook (el '0' identifica al dueño de la API Key) https://forum.intervals.icu/t/intervals-icu-api-integration-cookbook/80090?page=2
+        url = "https://intervals.icu/api/v1/athlete/0"
         
-        # URL oficial usando tu ID numérico directo
-        url = "https://intervals.icu/api/v1/athlete/profile"
-        
-        # 2. El método nativo e infalible de requests para Intervals.icu
-        # Dejamos que requests maneje la autenticación de forma limpia
-        respuesta = requests.get(url, auth=('athlete', api_key), timeout=10)
+        # 2. Autenticación oficial del Foro de Intervals:
+        # El usuario SIEMPRE es la cadena exacta "API_KEY"
+        respuesta = requests.get(url, auth=('API_KEY', api_key), timeout=10)
         
         if respuesta.status_code == 200:
             datos = respuesta.json()
