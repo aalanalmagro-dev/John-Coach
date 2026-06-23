@@ -23,27 +23,37 @@ def obtener_metricas_intervals():
     try:
         api_key = str(st.secrets["INTERVALS_API_KEY"]).strip()
         
-        # 1. URL GENERAL: Para extraer el Nombre y el FTP real
         url_atleta = "https://intervals.icu/api/v1/athlete/0"
-        # 2. URL WELLNESS: Para extraer CTL, ATL y Forma actuales
         url_wellness = "https://intervals.icu/api/v1/athlete/0/wellness"
         
-        # Lanzamos ambas peticiones con las credenciales oficiales del Cookbook
         res_atleta = requests.get(url_atleta, auth=('API_KEY', api_key), timeout=10)
         res_wellness = requests.get(url_wellness, auth=('API_KEY', api_key), timeout=10)
         
-        # Inicializamos variables por defecto por si falla alguna lectura parcial
         nombre_usuario = "Atleta Conectado"
-        ftp_real = 260
+        ftp_real = 250  # Valor base de seguridad si todo fallara de origen
         ctl_real, atl_real = 0.0, 0.0
         
-        # Procesamos los datos estáticos del atleta (Nombre y FTP)
         if res_atleta.status_code == 200:
             datos_atleta = res_atleta.json()
             nombre_usuario = datos_atleta.get("name") or datos_atleta.get("username", "Atleta Conectado")
-            ftp_real = datos_atleta.get("icu_ftp") or datos_atleta.get("ftp", 240)
             
-        # Procesamos las métricas dinámicas de Wellness (CTL y ATL)
+            # 🔥 INTENTO 1: Buscar en la raíz tradicional
+            ftp_api = datos_atleta.get("icu_ftp") or datos_atleta.get("ftp")
+            
+            # 🔥 INTENTO 2: Buscar en la estructura de ciclismo (donde Intervals suele guardarlo)
+            if not ftp_api and "cycling_settings" in datos_atleta:
+                ftp_api = datos_atleta["cycling_settings"].get("ftp")
+                
+            # 🔥 INTENTO 3: Buscar en las zonas generales
+            if not ftp_api and "zones" in datos_atleta:
+                ftp_api = datos_atleta["zones"].get("ftp")
+            
+            if ftp_api:
+                ftp_real = int(ftp_api)
+            else:
+                # Si sigue sin encontrarlo, dejamos un chivato temporal en la interfaz
+                st.info("Estructura detectada en la API: " + str(list(datos_atleta.keys())))
+            
         if res_wellness.status_code == 200:
             datos_wellness = res_wellness.json()
             if isinstance(datos_wellness, list) and len(datos_wellness) > 0:
@@ -54,7 +64,6 @@ def obtener_metricas_intervals():
             ctl_real = ultimo_dia.get("ctl") or ultimo_dia.get("ctlStart", 0)
             atl_real = ultimo_dia.get("atl") or ultimo_dia.get("atlStart", 0)
 
-        # Si al menos una ha ido bien, damos luz verde
         if res_atleta.status_code == 200 or res_wellness.status_code == 200:
             return {
                 "exito": True,
@@ -69,14 +78,14 @@ def obtener_metricas_intervals():
             return {
                 "exito": False,
                 "ftp": 250, "ctl": 0, "atl": 0, "balance": 0, "nombre": "Error",
-                "error_msg": f"Error de sincronización (Códigos: {res_atleta.status_code} / {res_wellness.status_code})"
+                "error_msg": f"Error de sincronización (Códigos: {res_atleta.status_code})"
             }
             
     except Exception as e:
         return {
             "exito": False,
             "ftp": 250, "ctl": 0, "atl": 0, "balance": 0, "nombre": "Error",
-            "error_msg": f"Fallo al procesar la sincronización combinada: {str(e)}"
+            "error_msg": f"Fallo en sincronización dinámica: {str(e)}"
         }
 # =====================================================================
 # EJECUCIÓN OBLIGATORIA (Aquí se crea la variable pase lo que pase)
