@@ -25,7 +25,7 @@ def obtener_metricas_intervals():
         api_key = str(st.secrets["INTERVALS_API_KEY"]).strip()
         
         # El endpoint universal oficial según el Cookbook (el '0' identifica al dueño de la API Key) https://forum.intervals.icu/t/intervals-icu-api-integration-cookbook/80090?page=2
-        url = "https://intervals.icu/api/v1/athlete/0/profile"
+        url = "https://intervals.icu/api/v1/athlete/0/wellness"
         
         # 2. Autenticación oficial del Foro de Intervals:
         # El usuario SIEMPRE es la cadena exacta "API_KEY"
@@ -33,13 +33,22 @@ def obtener_metricas_intervals():
         
         if respuesta.status_code == 200:
             datos = respuesta.json()
+
+            # El endpoint wellness suele devolver una lista con los últimos días. 
+            # Cogemos el día más reciente (el último elemento)
+            if isinstance(datos, list) and len(datos) > 0:
+                ultimo_dia = datos[-1]
+            else:
+                ultimo_dia = datos if isinstance(datos, dict) else {}
+
+            
             return {
                 "exito": True,
-                "ftp": datos.get("icu_ftp") or datos.get("ftp", 250),
-                "ctl": round(datos.get("ctl", 0), 1),
-                "atl": round(datos.get("atl", 0), 1),
-                "balance": round(datos.get("ctl", 0) - datos.get("atl", 0), 1),
-                "ramp_rate": round(datos.get("ramp_rate", 0), 1),
+                "ftp": ultimo_dia.get("icu_ftp") or ultimo_dia.get("ftp", 250),
+                "ctl": round(ultimo_dia.get("ctl") or ultimo_dia.get("ctlStart", 0), 1),
+                "atl": round(ultimo_dia.get("atl") or ultimo_dia.get("atlStart", 0), 1),
+                "balance": round((ultimo_dia.get("ctl") or 0) - (ultimo_dia.get("atl") or 0), 1),
+                "ramp_rate": round(ultimo_dia.get("ramp_rate", 0), 1),
                 "nombre": datos.get("name", "Atleta Piloto"),
                 "error_msg": None
             }
