@@ -34,7 +34,7 @@ def obtener_metricas_intervals():
         
         # Inicializamos variables por defecto por si falla alguna lectura parcial
         nombre_usuario = "Atleta Conectado"
-        ftp_real = 250
+        ftp_real = 260
         ctl_real, atl_real = 0.0, 0.0
         
         # Procesamos los datos estáticos del atleta (Nombre y FTP)
@@ -178,6 +178,21 @@ if prompt_usuario := st.chat_input("Escribe aquí tus sensaciones..."):
         for msg in st.session_state.messages[1:]:
             peticion_con_memoria.append(msg)
 
+    # 🔥 2. TRADUCCIÓN AL FORMATO OFICIAL DE GOOGLE-GENAI
+    # Mapeamos 'assistant' a 'model' y estructuramos cada mensaje como exige el SDK moderno
+    contents_api = []
+    for msg in peticion_con_memoria:
+        # Gemini usa 'model' en lugar de 'assistant'
+        rol_gemini = "model" if msg["role"] == "assistant" else "user"
+        
+        contents_api.append(
+            types.Content(
+                role=rol_gemini,
+                parts=[types.Part.from_text(text=msg["content"])]
+            )
+        )
+        
+    
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
             try:
