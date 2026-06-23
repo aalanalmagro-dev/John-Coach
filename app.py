@@ -41,7 +41,7 @@ def obtener_metricas_intervals():
         if res_atleta.status_code == 200:
             datos_atleta = res_atleta.json()
             nombre_usuario = datos_atleta.get("name") or datos_atleta.get("username", "Atleta Conectado")
-            ftp_real = datos_atleta.get("icu_ftp") or datos_atleta.get("ftp", 250)
+            ftp_real = datos_atleta.get("icu_ftp") or datos_atleta.get("ftp", 240)
             
         # Procesamos las métricas dinámicas de Wellness (CTL y ATL)
         if res_wellness.status_code == 200:
