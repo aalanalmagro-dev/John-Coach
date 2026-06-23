@@ -94,7 +94,7 @@ def obtener_metricas_intervals():
             "ftp": 250, "ctl": 0, "atl": 0, "balance": 0, "nombre": "Error",
             "error_msg": f"Fallo en sincronización dinámica: {str(e)}"
         }
-====================================================
+# ====================================================
 # EJECUCIÓN OBLIGATORIA (Aquí se crea la variable pase lo que pase)
 # =====================================================================
 with st.spinner("Sincronizando con tu perfil de Intervals.icu..."):
