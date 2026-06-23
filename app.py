@@ -25,7 +25,7 @@ def obtener_metricas_intervals():
         api_key = str(st.secrets["INTERVALS_API_KEY"]).strip()
         
         # El endpoint universal oficial según el Cookbook (el '0' identifica al dueño de la API Key) https://forum.intervals.icu/t/intervals-icu-api-integration-cookbook/80090?page=2
-        url = "https://intervals.icu/api/v1/athlete/0/wellness"
+        url = "https://intervals.icu/api/v1/athlete/0/profile"
         
         # 2. Autenticación oficial del Foro de Intervals:
         # El usuario SIEMPRE es la cadena exacta "API_KEY"
