@@ -10,7 +10,6 @@ st.title("🚴 John Coach")
 st.subheader("Tu entrenador personal experto en ciclismo")
 
 # 2. INICIALIZAR EL CLIENTE DE IA
-# Nota: Si usas la nueva librería 'google-genai', asegúrate de tenerla en tu requirements.txt
 from google import genai
 from google.genai import types
 client = genai.Client()
@@ -43,13 +42,10 @@ def obtener_metricas_intervals():
             # 2. Exploramos 'sportSettings' (Detectado en tu API)
             if not ftp_api and "sportSettings" in datos_atleta:
                 settings = datos_atleta["sportSettings"]
-                # Si es una lista, buscamos el bloque de ciclismo o cogemos el primero
                 if isinstance(settings, list) and len(settings) > 0:
-                    # Intentamos buscar el que sea de ciclismo de forma inteligente
                     bici_setting = next((s for s in settings if str(s.get("id")).lower() in ["cycling", "bici", "road"]), settings[0])
                     ftp_api = bici_setting.get("ftp") or bici_setting.get("icu_ftp")
                 elif isinstance(settings, dict):
-                    # Si es un diccionario, intentamos sacar el ftp general o de cycling
                     ftp_api = settings.get("ftp") or settings.get("cycling", {}).get("ftp")
 
             # 3. Último cartucho dinámico: 'icu_type_settings'
@@ -94,8 +90,9 @@ def obtener_metricas_intervals():
             "ftp": 250, "ctl": 0, "atl": 0, "balance": 0, "nombre": "Error",
             "error_msg": f"Fallo en sincronización dinámica: {str(e)}"
         }
+
 # ====================================================
-# EJECUCIÓN OBLIGATORIA (Aquí se crea la variable pase lo que pase)
+# EJECUCIÓN OBLIGATORIA
 # =====================================================================
 with st.spinner("Sincronizando con tu perfil de Intervals.icu..."):
     metricas = obtener_metricas_intervals()
@@ -118,7 +115,6 @@ if metricas["exito"]:
         
     ftp_intervals = metricas['ftp']
 else:
-    # Si falla, pintamos el error de forma segura sin romper la app
     st.error(f"No se han podido cargar los datos automáticos: {metricas['error_msg']}")
     ftp_intervals = 250
     
@@ -126,9 +122,7 @@ else:
     try:
         raw_id = st.secrets["INTERVALS_ATHLETE_ID"]
         raw_key = st.secrets["INTERVALS_API_KEY"]
-        
         st.write(f"• **ID en Secrets:** `{raw_id}` (Longitud: {len(str(raw_id))} caracteres)")
-        
         if len(raw_key) > 8:
             ofuscada = f"{raw_key[:4]}••••••••{raw_key[-4:]}"
         else:
@@ -160,7 +154,6 @@ Eres John Coach. No asumas que el atleta tiene un entreno pautado a menos que é
 Eres el Director Técnico y entrenador jefe de 'John Coach'. Tu rol es el de un entrenador de carne y hueso, un colega experto y un mentor de total confianza para el ciclista.
 Métricas actuales del atleta: FTP: {ftp_intervals} W, CTL: {metricas['ctl']}, ATL: {metricas['atl']}.
 Mantén una conversación fluida, dinámica y adaptativa en base a estos datos.
-
 """
 
 # HISTORIAL LOCAL
@@ -183,26 +176,29 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# =====================================================================
+# LÓGICA DEL CHAT MODIFICADA SÓLO CON LAS REGLAS MÍNIMAS DE PERSISTENCIA
+# =====================================================================
 if prompt_usuario := st.chat_input("Escribe aquí tus sensaciones..."):
     with st.chat_message("user"):
         st.markdown(prompt_usuario)
-    st.session_state.messages.append({"role": "user", "content": prompt_usuario})
-
-    peticion_con_memoria = []
-    if len(st.session_state.messages) == 2:
+    
+    # 🛠️ CORRECCIÓN: Si es el primer mensaje, guardamos el enriquecido en el historial para que no se olvide luego
+    if len(st.session_state.messages) == 1:
         CONTEXTO_HOY = f"Sesión: {vatios_medios}W NP, {frecuencia_cardiaca}ppm, RPE: {rpe}/10. Mensaje: {prompt_usuario}"
-        peticion_con_memoria.append({"role": "user", "content": CONTEXTO_HOY})
+        st.session_state.messages.append({"role": "user", "content": CONTEXTO_HOY})
     else:
-        for msg in st.session_state.messages[1:]:
-            peticion_con_memoria.append(msg)
+        st.session_state.messages.append({"role": "user", "content": prompt_usuario})
 
-    # 🔥 2. TRADUCCIÓN AL FORMATO OFICIAL DE GOOGLE-GENAI
-    # Mapeamos 'assistant' a 'model' y estructuramos cada mensaje como exige el SDK moderno
+    # Tu misma lógica de empaquetar memoria para la API
+    peticion_con_memoria = []
+    for msg in st.session_state.messages[1:]:
+        peticion_con_memoria.append(msg)
+
+    # Traducción oficial al SDK
     contents_api = []
     for msg in peticion_con_memoria:
-        # Gemini usa 'model' en lugar de 'assistant'
         rol_gemini = "model" if msg["role"] == "assistant" else "user"
-        
         contents_api.append(
             types.Content(
                 role=rol_gemini,
@@ -210,13 +206,11 @@ if prompt_usuario := st.chat_input("Escribe aquí tus sensaciones..."):
             )
         )
         
-    
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
             try:
                 response = client.models.generate_content(
                     model='gemini-2.5-flash',
-                    #model='gemini-2.5-pro',
                     contents=contents_api,
                     config=types.GenerateContentConfig(system_instruction=PROMPT_SISTEMA, temperature=0.6),
                 )
@@ -224,6 +218,10 @@ if prompt_usuario := st.chat_input("Escribe aquí tus sensaciones..."):
                 st.markdown(respuesta_ia)
                 st.session_state.messages.append({"role": "assistant", "content": respuesta_ia})
                 guardar_historial(st.session_state.messages)
+                
+                # 🛠️ AGREGADO: Forzar refresco para que la pantalla se ordene perfectamente
+                st.rerun()
+                
             except Exception as e:
                 st.error(f"Hubo un error en el motor de IA: {e}")
 
@@ -233,5 +231,5 @@ if st.button("✅ Validar Entrenamiento (Socio / Entrenador)"):
 
 if st.sidebar.button("Limpiar Historial"):
     st.session_state.messages = []
-    # Y borras el archivo local si lo estás usando
+    # 🛠️ CORRECCIÓN: Añadido rerun para que surta efecto al instante en el botón lateral
     st.rerun()
